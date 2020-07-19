@@ -1,17 +1,16 @@
-class Address {
-  region_id = ''
-  region = ''
-  locality = ''
-  street = ''
-  extended = ''
-
-  constructor(init?: Partial<Address>) {
-    Object.assign(this, init)
-  }
-}
-
 let CACHE: {[yubin3: string]: {[yubin7: string]: string[]}} = {};
+
 module YubinBango {
+  class Location {
+    region_id = ''
+    region = ''
+    locality = ''
+    street = ''
+    extended = ''
+    constructor(init?: Partial<Location>) {
+      Object.assign(this, init)
+    }
+  }
   export class Core {
     URL = 'https://yubinbango.github.io/yubinbango-data/data';
     REGION: Array<string | null> = [
@@ -26,18 +25,18 @@ module YubinBango {
       '福岡県', '佐賀県', '長崎県', '熊本県', '大分県',
       '宮崎県', '鹿児島県', '沖縄県'
     ];
-    constructor(inputVal = '', callback?: (addr: Address) => Address) {
+    constructor(inputVal = '', callback: (addr: Location) => void) {
       if(inputVal !== ''){
         // 全角の数字を半角に変換 ハイフンが入っていても数字のみの抽出
         const a = inputVal.replace(/[０-９]/g, (s: string) => String.fromCharCode(s.charCodeAt(0) - 65248));
         const b = a.match(/\d/g);
-        const c = b.join('');
+        const c = b?.join('') || "";
         const yubin7 = this.chk7(c);
         // 7桁の数字の時のみ作動
         if (yubin7 !== '') {
           this.getAddr(yubin7, callback);
         } else {
-          callback(new Address());
+          callback(new Location());
         }
       }
     }
@@ -48,20 +47,20 @@ module YubinBango {
         return '';
       }
     }
-    selectAddr(addr: string[]): Address {
+    selectAddr(addr: string[]): Location {
       if (addr && addr[0] && addr[1]) {
-        return new Address({
+        return new Location({
           region_id: addr[0],
-          region: this.REGION[addr[0]],
+          region: this.REGION[parseInt(addr[0])] || "",
           locality: addr[1],
           street: addr[2],
           extended: addr[3]
         })
       } else {
-        return new Address()
+        return new Location()
       }
     }
-    jsonp(url: string, fn: (addrMap: {[yubin7: string]: string[]}) => Address) {
+    jsonp(url: string, fn: (addrMap: {[yubin7: string]: string[]}) => void) {
       window['$yubin'] = (data: {[yubin7: string]: string[]}) => fn(data);
       const scriptTag = document.createElement("script");
       scriptTag.setAttribute("type", "text/javascript");
@@ -69,15 +68,15 @@ module YubinBango {
       scriptTag.setAttribute("src", url);
       document.head.appendChild(scriptTag);
     }
-    getAddr(yubin7: string, fn: (addr: Address) => Address): Address {
+    getAddr(yubin7: string, callback: (addr: Location) => void): void {
       const yubin3 = yubin7.substr(0, 3);
       // 郵便番号上位3桁でキャッシュデータを確認
       if (yubin3 in Object.keys(CACHE) && yubin7 in Object.keys(CACHE[yubin3])) {
-        return fn(this.selectAddr(CACHE[yubin3][yubin7]));
+        callback(this.selectAddr(CACHE[yubin3][yubin7]))
       } else {
         this.jsonp(`${this.URL}/${yubin3}.js`, (data) => {
           CACHE[yubin3] = data;
-          return fn(this.selectAddr(data[yubin7]));
+          callback(this.selectAddr(data[yubin7]))
         });
       }
     }
